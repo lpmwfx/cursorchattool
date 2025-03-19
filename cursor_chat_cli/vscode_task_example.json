@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Udtræk Cursor Chat med Request ID",
+      "type": "shell",
+      "command": "cd ${workspaceFolder} && dart bin/cursor_chat_tool.dart --request-id ${input:requestId}",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "requestId",
+      "description": "Indtast request ID (f.eks. 1e4ddc91eebcec20571cd738f31756a9_5154)",
+      "default": "",
+      "type": "promptString"
+    }
+  ]
+} 

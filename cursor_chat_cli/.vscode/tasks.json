@@ -1,0 +1,72 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Udtræk Cursor Chat med Request ID",
+      "type": "shell",
+      "command": "cd ${workspaceFolder} && dart bin/cursor_chat_tool.dart --request-id ${input:requestId}",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Kopier Chat JSON til aktuel mappe",
+      "type": "shell",
+      "command": "cd ${workspaceFolder} && dart bin/copy_chat.dart ${input:requestId}",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "Vis alle Cursor chats",
+      "type": "shell",
+      "command": "cd ${workspaceFolder} && dart bin/cursor_chat_tool.dart --list",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "Udtræk alle Cursor chats",
+      "type": "shell",
+      "command": "cd ${workspaceFolder} && dart bin/cursor_chat_tool.dart --extract all --format json --output ${workspaceFolder}/output",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "requestId",
+      "description": "Indtast request ID (f.eks. 1e4ddc91eebcec20571cd738f31756a9_5154)",
+      "default": "",
+      "type": "promptString"
+    }
+  ]
+} 
