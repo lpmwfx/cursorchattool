@@ -1,7 +1,7 @@
 #!/usr/bin/env dart
 
-// Request ID er foldernavnene i workspaceStorage-mappen
-// Dette er vigtigt at forstå for korrekt visning af chat-data
+// Request ID is the folder names in the workspaceStorage directory
+// This is important to understand for correct display of chat data
 
 import 'dart:io';
 import 'package:args/args.dart';
@@ -16,7 +16,7 @@ import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import 'package:collection/collection.dart';
 
-/// Finder stien til Cursor's data mappe baseret på OS
+/// Finds the path to Cursor's data folder based on the OS
 String getCursorDataPath() {
   String home = '';
   
@@ -25,7 +25,7 @@ String getCursorDataPath() {
   } else if (Platform.environment.containsKey('USERPROFILE')) {
     home = Platform.environment['USERPROFILE']!;
   } else {
-    print('Kunne ikke finde hjemmemappen');
+    print('Could not find home directory');
     exit(1);
   }
 
@@ -36,18 +36,18 @@ String getCursorDataPath() {
   } else if (Platform.isWindows) {
     return path.join(home, 'AppData', 'Roaming', 'Cursor', 'User', 'workspaceStorage');
   } else {
-    print('Ikke-understøttet platform: ${Platform.operatingSystem}');
+    print('Unsupported platform: ${Platform.operatingSystem}');
     exit(1);
   }
 }
 
-/// Finder chat ud fra request ID og returnerer den fulde chat
+/// Finds a chat using the request ID and returns the full chat
 Future<Chat?> findChatByRequestId(String requestId) async {
   final config = Config.load('~/.cursor_chat_tool.conf');
   final browser = ChatBrowser(config);
   final allChats = await browser.loadAllChats();
   
-  // Find chat med matching requestId
+  // Find chat with matching requestId
   for (final chat in allChats) {
     if (chat.id == requestId || chat.id.contains(requestId) || 
         (chat.requestId.isNotEmpty && (chat.requestId == requestId || chat.requestId.contains(requestId)))) {
@@ -55,31 +55,31 @@ Future<Chat?> findChatByRequestId(String requestId) async {
     }
   }
   
-  print('Kunne ikke finde chat med request ID: $requestId');
+  print('Could not find chat with request ID: $requestId');
   return null;
 }
 
-/// Henter en fuld chat fra databasen via chat ID
+/// Retrieves a full chat from the database via chat ID
 Chat? getFullChatFromDb(Database db, int chatId, [String? requestId]) {
   try {
-    // Hent meddelelser direkte fra chat_messages
+    // Get messages directly from chat_messages
     final messageResult = db.select(
       "SELECT content, role, timestamp FROM chat_messages WHERE folder_id = ? ORDER BY timestamp",
       [chatId]
     );
     
     if (messageResult.isEmpty) {
-      // Hvis folder_id ikke virker, prøv at hente dem alle
+      // If folder_id doesn't work, try to get them all
       final allMessages = db.select(
         "SELECT content, role, timestamp FROM chat_messages ORDER BY timestamp"
       );
       
       if (allMessages.isEmpty) {
-        print('Ingen beskeder fundet i databasen');
+        print('No messages found in database');
         return null;
       }
       
-      // Hvis vi har requestId, brug det
+      // If we have requestId, use it
       final rId = requestId ?? 'unavailable';
       final messages = <ChatMessage>[];
       
@@ -95,7 +95,7 @@ Chat? getFullChatFromDb(Database db, int chatId, [String? requestId]) {
         ));
       }
       
-      // Generer titel fra første besked
+      // Generate title from first message
       String title = rId;
       if (messages.isNotEmpty) {
         final firstMsg = messages.first;
@@ -113,7 +113,7 @@ Chat? getFullChatFromDb(Database db, int chatId, [String? requestId]) {
       );
     }
     
-    // Hvis vi har resultater med folder_id
+    // If we have results with folder_id
     final messages = <ChatMessage>[];
     String chatRequestId = requestId ?? 'unavailable';
     
@@ -129,7 +129,7 @@ Chat? getFullChatFromDb(Database db, int chatId, [String? requestId]) {
       ));
     }
     
-    // Generer titel fra første besked
+    // Generate title from first message
     String title = chatRequestId;
     if (messages.isNotEmpty) {
       final firstMsg = messages.first;
@@ -146,60 +146,60 @@ Chat? getFullChatFromDb(Database db, int chatId, [String? requestId]) {
       requestId: chatRequestId,
     );
   } catch (e) {
-    print('Fejl ved hentning af chat fra db: $e');
+    print('Error retrieving chat from db: $e');
     return null;
   }
 }
 
-/// Henter en fuld chat fra CLI via chat ID
+/// Retrieves a full chat from CLI via chat ID
 Future<Chat?> getFullChatFromCli(String chatId) async {
   try {
     // Parse chatId as integer index
     int? index = int.tryParse(chatId);
     if (index != null) {
-      // Indlæs alle chats og vælg ud fra index
+      // Load all chats and select by index
       final allChats = await getAllChats();
       
       if (allChats.isEmpty) {
-        print('Ingen chats fundet');
+        print('No chats found');
         return null;
       }
       
       if (index < 1 || index > allChats.length) {
-        print('Ugyldigt chat indeks: $index (skal være mellem 1 og ${allChats.length})');
+        print('Invalid chat index: $index (should be between 1 and ${allChats.length})');
         return null;
       }
       
       return allChats[index - 1];
     }
     
-    // Hvis ikke et indeks, prøv at finde chat ud fra ID
+    // If not an index, try to find chat by ID
     return await findChatByRequestId(chatId);
   } catch (e) {
-    print('Fejl ved hentning af chat: $e');
+    print('Error retrieving chat: $e');
     return null;
   }
 }
 
-/// Henter alle chats (via ChatBrowser klassen)
+/// Retrieves all chats (via ChatBrowser class)
 Future<List<Chat>> getAllChats() async {
   final config = Config.load('~/.cursor_chat_tool.conf');
   final browser = ChatBrowser(config);
   return await browser.loadAllChats();
 }
 
-/// Viser liste over alle chats
+/// Shows a list of all chats
 Future<void> printChatList() async {
   final allChats = await getAllChats();
   
   if (allChats.isEmpty) {
-    print('Ingen chat historik fundet');
+    print('No chat history found');
     return;
   }
   
-  print('=== Cursor Chat Historik Browser ===');
+  print('=== Cursor Chat History Browser ===');
   print('');
-  print('ID | Titel | Request ID | Antal');
+  print('ID | Title | Request ID | Count');
   print('----------------------------------------');
   
   for (var i = 0; i < allChats.length; i++) {
@@ -208,31 +208,46 @@ Future<void> printChatList() async {
         ? chat.id
         : chat.title;
     
-    // Brug chat.id som fallback for requestId
+    // Use chat.id as fallback for requestId
     final requestIdDisplay = chat.requestId.isNotEmpty ? chat.requestId : chat.id.split('_').first;
     
     print('${i + 1} | ${displayTitle} | $requestIdDisplay | ${chat.messages.length}');
   }
   
   print('');
-  print('Fandt ${allChats.length} chat historikker');
+  print('Found ${allChats.length} chat histories');
 }
 
-/// Main funktion
+/// Main function
 void main(List<String> arguments) async {
   final parser = ArgParser()
-    ..addFlag('help', abbr: 'h', negatable: false, help: 'Vis hjælp')
-    ..addFlag('list', abbr: 'l', negatable: false, help: 'List alle chat historikker')
-    ..addFlag('tui', abbr: 't', negatable: false, help: 'Åben TUI browser')
-    ..addOption('extract', abbr: 'e', help: 'Udtræk en specifik chat (id eller alle)')
+    ..addFlag('help', abbr: 'h', negatable: false, help: 'Show help')
+    ..addFlag('list', abbr: 'l', negatable: false, help: 'List all chat histories')
+    ..addFlag('tui', abbr: 't', negatable: false, help: 'Open TUI browser')
+    ..addOption('extract', abbr: 'e', help: 'Extract a specific chat (id or all)')
     ..addOption('format', abbr: 'f', defaultsTo: 'text', help: 'Output format (text, markdown, html, json)')
-    ..addOption('output', abbr: 'o', defaultsTo: './output', help: 'Output mappe')
-    ..addOption('config', abbr: 'c', defaultsTo: '~/.cursor_chat_tool.conf', help: 'Sti til konfigurationsfil')
-    ..addOption('request-id', abbr: 'r', help: 'Udtræk chat med specifik request ID og gem JSON i nuværende mappe')
-    ..addOption('output-dir', abbr: 'd', help: 'Specifik output mappe for request-id kommandoen');
+    ..addOption('output', abbr: 'o', defaultsTo: './output', help: 'Output directory')
+    ..addOption('config', abbr: 'c', defaultsTo: '~/.cursor_chat_tool.conf', help: 'Path to configuration file')
+    ..addOption('request-id', abbr: 'r', help: 'Extract chat with specific request ID and save JSON to current directory')
+    ..addOption('output-dir', abbr: 'd', help: 'Specific output directory for request-id command');
 
   try {
-    final results = parser.parse(arguments);
+    ArgResults results;
+    
+    try {
+      results = parser.parse(arguments);
+    } catch (e) {
+      // If parsing fails, check if the first argument could be a request ID
+      if (arguments.isNotEmpty && !arguments[0].startsWith('-')) {
+        final requestId = arguments[0];
+        // Try to process the request ID directly
+        await extractChatWithRequestId(requestId, Directory.current.path);
+        return;
+      } else {
+        // If not a request ID, rethrow the error
+        rethrow;
+      }
+    }
     
     // Load config
     final configPath = results['config'] as String;
@@ -254,11 +269,11 @@ void main(List<String> arguments) async {
       return;
     }
     
-    // Håndtér request-id parameter
+    // Handle request-id parameter
     if (results.wasParsed('request-id')) {
       final requestId = results['request-id'] as String;
       
-      // Bestem output-mappen (nuværende mappe eller brugerspecificeret)
+      // Determine output directory (current directory or user-specified)
       final outputDir = results.wasParsed('output-dir') 
           ? results['output-dir'] as String
           : Directory.current.path;
@@ -272,18 +287,18 @@ void main(List<String> arguments) async {
       final format = results['format'] as String;
       final outputDir = results['output'] as String;
       
-      // Opret output mappe hvis den ikke eksisterer
+      // Create output directory if it doesn't exist
       final outputDirectory = Directory(outputDir);
       if (!outputDirectory.existsSync()) {
         outputDirectory.createSync(recursive: true);
       }
       
       if (chatId.toLowerCase() == 'alle' || chatId.toLowerCase() == 'all') {
-        // Udtræk alle chats
+        // Extract all chats
         final allChats = await getAllChats();
         
         if (allChats.isEmpty) {
-          print('Ingen chats fundet til udtrækning');
+          print('No chats found for extraction');
           return;
         }
         
@@ -292,17 +307,17 @@ void main(List<String> arguments) async {
           final outputFile = _getOutputFile(chat, outputDir, format);
           final formattedContent = _formatChat(chat, format);
           File(outputFile).writeAsStringSync(formattedContent);
-          print('Udtrak chat: ${chat.title} til ${path.basename(outputFile)}');
+          print('Extracted chat: ${chat.title} to ${path.basename(outputFile)}');
           counter++;
         }
         
-        print('Udtrak $counter chats til $outputDir');
+        print('Extracted $counter chats to $outputDir');
       } else {
-        // Udtræk en specifik chat
+        // Extract a specific chat
         final specificChat = await getFullChatFromCli(chatId);
         
         if (specificChat == null) {
-          print('Ingen chats fundet til udtrækning');
+          print('No chats found for extraction');
           return;
         }
         
@@ -310,8 +325,15 @@ void main(List<String> arguments) async {
         final formattedContent = _formatChat(specificChat, format);
         File(outputFile).writeAsStringSync(formattedContent);
         
-        print('Udtrak chat "${specificChat.title}" til ${path.basename(outputFile)}');
+        print('Extracted chat "${specificChat.title}" to ${path.basename(outputFile)}');
       }
+      return;
+    }
+    
+    // If no options specified but there's a positional argument, assume it's a request ID
+    if (results.rest.isNotEmpty) {
+      final requestId = results.rest[0];
+      await extractChatWithRequestId(requestId, Directory.current.path);
       return;
     }
     
@@ -319,41 +341,54 @@ void main(List<String> arguments) async {
       _printUsage(parser);
     }
   } catch (e) {
-    print('Fejl ved parsing af argumenter: $e');
-    print('Brug --help for at se tilgængelige kommandoer');
+    print('Error parsing arguments: $e');
+    print('Use --help to see available commands');
     exit(1);
   }
 }
 
-/// Udtræk en chat med et specifikt request ID og gem som JSON i den specificerede mappe
+/// Extract a chat with a specific request ID and save as JSON in the specified directory
 Future<void> extractChatWithRequestId(String requestId, String outputDir) async {
   final chat = await findChatByRequestId(requestId);
   
   if (chat == null) {
-    print('Ingen chat fundet med request ID: $requestId');
+    print('No chat found with request ID: $requestId');
     return;
   }
   
-  // Opret output-filen - her bruger vi kun request ID som filnavn
-  final filename = '${chat.id}.json';
+  // Use a more descriptive filename
+  final title = _sanitizeFilename(chat.title);
+  final filename = '$title-${chat.id}.json';
   final outputFile = path.join(outputDir, filename);
   
-  // Lav en minimal JSON med ID
+  // Create full JSON with all messages
   final jsonContent = JsonEncoder.withIndent('  ').convert({
     'id': chat.id,
-    'title': chat.title
+    'title': chat.title,
+    'requestId': chat.requestId,
+    'messages': chat.messages.map((msg) => {
+      'role': msg.role,
+      'content': msg.content,
+      'timestamp': msg.timestamp.millisecondsSinceEpoch
+    }).toList()
   });
   
   File(outputFile).writeAsStringSync(jsonContent);
   
-  print('Chat med request ID "${chat.id}" gemt som ${path.basename(outputFile)}');
+  print('Chat with request ID "${chat.id}" saved as ${path.basename(outputFile)}');
 }
 
-// Hjælpefunktioner
+// Help function
 void _printUsage(ArgParser parser) {
   print('Cursor Chat Browser & Extractor\n');
-  print('Brug: cursor_chat_tool [options]\n');
+  print('Usage: cursor_chat_tool [options] [request_id]\n');
+  print('If a request_id is provided as a direct argument, the tool will save that chat as JSON in the current directory.\n');
   print(parser.usage);
+  print('\nExamples:');
+  print('  cursor_chat_tool --list             # List all chats');
+  print('  cursor_chat_tool --tui              # Open the TUI browser');
+  print('  cursor_chat_tool 1234abcd           # Extract chat with ID 1234abcd to current directory');
+  print('  cursor_chat_tool --extract=all      # Extract all chats');
 }
 
 String _formatChat(Chat chat, String format) {
@@ -407,7 +442,7 @@ String _formatChat(Chat chat, String format) {
         final cssClass = msg.role == 'user' ? 'user' : 'assistant';
         
         buffer.writeln('<div class="message ${cssClass}">');
-        buffer.writeln('<div class="timestamp">Besked timestamp: ${timestamp}</div>');
+        buffer.writeln('<div class="timestamp">Message timestamp: ${timestamp}</div>');
         buffer.writeln('<div class="role">${_escapeHtml(msg.role)}</div>');
         buffer.writeln('<div class="content">${_escapeHtml(msg.content)}</div>');
         buffer.writeln('</div>');
@@ -421,13 +456,15 @@ String _formatChat(Chat chat, String format) {
     case 'text':
     default:
       final buffer = StringBuffer();
-      buffer.writeln('Titel: ${chat.title}');
-      buffer.writeln('ID: ${chat.id}');
-      buffer.writeln('Antal beskeder: ${chat.messages.length}\n');
+      buffer.writeln('=== ${chat.title} ===');
+      buffer.writeln('Chat ID: ${chat.id}');
+      buffer.writeln('Request ID: ${chat.requestId}');
+      buffer.writeln('Message count: ${chat.messages.length}');
+      buffer.writeln('');
       
       for (final msg in chat.messages) {
         final timestamp = DateFormat('yyyy-MM-dd HH:mm:ss.SSSSSS').format(msg.timestamp);
-        buffer.writeln('--- ${msg.role} (${timestamp}) ---');
+        buffer.writeln('[${msg.role} - ${timestamp}]');
         buffer.writeln(msg.content);
         buffer.writeln('');
       }
@@ -436,15 +473,14 @@ String _formatChat(Chat chat, String format) {
   }
 }
 
+/// Gets the output file path
 String _getOutputFile(Chat chat, String outputDir, String format) {
   final sanitizedTitle = _sanitizeFilename(chat.title);
-  final timestamp = DateTime.now().millisecondsSinceEpoch;
-  final ext = _getExtensionForFormat(format);
-  
-  // Brug en kombination af titel og ID for unikhed
-  return path.join(outputDir, '${sanitizedTitle}_${chat.id}_$timestamp$ext');
+  final extension = _getExtensionForFormat(format);
+  return path.join(outputDir, '${sanitizedTitle}_${chat.id}$extension');
 }
 
+/// Gets the file extension for the given format
 String _getExtensionForFormat(String format) {
   switch (format.toLowerCase()) {
     case 'json': return '.json';
@@ -458,10 +494,10 @@ String _getExtensionForFormat(String format) {
 String _sanitizeFilename(String input) {
   if (input.isEmpty) return 'untitled';
   
-  // Begræns længden
+  // Limit length
   var sanitized = input.length > 50 ? input.substring(0, 50) : input;
   
-  // Erstat ugyldige filnavnstegn
+  // Replace invalid filename characters
   sanitized = sanitized.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
   sanitized = sanitized.replaceAll(RegExp(r'\s+'), '_');
   
@@ -479,7 +515,7 @@ String _escapeHtml(String text) {
 
 int min(int a, int b) => a < b ? a : b;
 
-// Fælles funktion til at konvertere en database værdi til JSON
+// Common function to convert a database value to JSON
 dynamic valueToJson(dynamic value) {
   if (value == null) return null;
   
@@ -490,13 +526,13 @@ dynamic valueToJson(dynamic value) {
     } else if (value is String) {
       jsonStr = value;
     } else {
-      print('Uventet værditype: ${value.runtimeType}');
+      print('Unexpected value type: ${value.runtimeType}');
       return null;
     }
     
     return jsonDecode(jsonStr);
   } catch (e) {
-    print('Fejl ved konvertering af værdi til JSON: $e');
+    print('Error converting value to JSON: $e');
     return null;
   }
 }

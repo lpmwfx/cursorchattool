@@ -4,10 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' as path;
 import 'package:collection/collection.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'dart:convert';
 import 'config.dart';
 import 'chat_model.dart';
 
-/// Klasse til at browse og vise chat historikker
+/// Class for browsing and displaying chat histories
 class ChatBrowser {
   final Config config;
   final console = Console();
@@ -15,13 +16,13 @@ class ChatBrowser {
 
   ChatBrowser(this.config);
 
-  /// Indlæser alle chats fra workspace storage mapperne
+  /// Loads all chats from workspace storage folders
   Future<List<Chat>> _loadChats() async {
     final storageDir = Directory(config.workspaceStoragePath);
 
     if (!storageDir.existsSync()) {
       print(
-          'Advarsel: Workspace storage mappe ikke fundet: ${config.workspaceStoragePath}');
+          'Warning: Workspace storage folder not found: ${config.workspaceStoragePath}');
       return [];
     }
 
@@ -29,141 +30,141 @@ class ChatBrowser {
     final skippedChats = <String>[];
 
     try {
-      // Gennemgå alle md5 hash mapper (workspace storage)
+      // Go through all md5 hash folders (workspace storage)
       await for (final entity in storageDir.list()) {
         if (entity is Directory) {
           final dbFile = File(path.join(entity.path, 'state.vscdb'));
 
-          // Tjek om der er en state.vscdb fil i mappen
+          // Check if there's a state.vscdb file in the folder
           if (dbFile.existsSync()) {
             try {
-              // Åbn SQLite database
+              // Open SQLite database
               final db = sqlite3.open(dbFile.path);
 
-              // Hent chat data fra databasen
+              // Get chat data from database
               final result = db.select(
                   "SELECT rowid, [key], value FROM ItemTable WHERE [key] IN "
                   "('aiService.prompts', 'workbench.panel.aichat.view.aichat.chatdata')");
 
-              // Behandl hver række
+              // Process each row
               for (final row in result) {
                 final rowId = row['rowid'] as int;
                 final key = row['key'] as String;
                 final value = row['value'] as String;
 
-                // Generer chat ID
+                // Generate chat ID
                 final chatId = '${entity.path.split(Platform.pathSeparator).last}_$rowId';
                 
-                // Forsøg at oprette en Chat fra værdien
+                // Try to create a Chat from the value
                 final chat = Chat.fromSqliteValue(chatId, value);
                 
-                // Validér chat og tilføj kun gyldige
+                // Validate chat and only add valid ones
                 if (chat != null) {
                   if (Chat.isValidChat(chat)) {
                     chats.add(chat);
                   } else {
-                    // Log at vi springer over en ugyldig chat
+                    // Log that we're skipping an invalid chat
                     skippedChats.add(chatId);
-                    print('Sprang over ugyldig chat: $chatId');
+                    print('Skipped invalid chat: $chatId');
                   }
                 }
               }
 
-              // Luk databasen
+              // Close the database
               db.dispose();
             } catch (e) {
-              print('Kunne ikke læse database ${dbFile.path}: $e');
+              print('Could not read database ${dbFile.path}: $e');
             }
           }
         }
       }
 
-      // Vis info om antal skippede chats
+      // Show info about number of skipped chats
       if (skippedChats.isNotEmpty) {
         print('');
-        print('Sprang over ${skippedChats.length} ugyldige chats');
+        print('Skipped ${skippedChats.length} invalid chats');
       }
 
-      // Sorter efter dato, nyeste først
+      // Sort by date, newest first
       chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
       return chats;
     } catch (e) {
-      print('Fejl ved indlæsning af chats: $e');
+      print('Error loading chats: $e');
       return [];
     }
   }
 
-  /// Offentlig metode til at indlæse alle chats
+  /// Public method to load all chats
   Future<List<Chat>> loadAllChats() async {
     return await _loadChats();
   }
 
-  /// Viser liste over alle chats i konsollen
+  /// Shows a list of all chats in the console
   Future<void> listChats() async {
     _chats = await _loadChats();
 
     if (_chats.isEmpty) {
-      print('Ingen chat historikker fundet i ${config.workspaceStoragePath}');
+      print('No chat histories found in ${config.workspaceStoragePath}');
       return;
     }
 
-    print('=== Cursor Chat Historik Browser ===');
+    print('=== Cursor Chat History Browser ===');
     print('');
-    print('ID | Titel | Request ID | Antal');
+    print('ID | Title | Request ID | Count');
     print('----------------------------------------');
 
     for (var i = 0; i < _chats.length; i++) {
       final chat = _chats[i];
       
-      // Vis enten title eller ID baseret på format
+      // Show either title or ID based on format
       final displayTitle = chat.title.isEmpty || chat.title == 'Chat ${chat.id}'
           ? chat.id
           : chat.title;
       
-      final requestIdDisplay = chat.requestId.isNotEmpty ? chat.requestId : 'N/A';
+      final requestIdDisplay = chat.requestId.isNotEmpty ? chat.requestId : chat.id.split('_').first;
       
       print('${i + 1} | ${displayTitle} | $requestIdDisplay | ${chat.messages.length}');
     }
     
     print('');
-    print('Fandt ${_chats.length} chat historikker');
+    print('Found ${_chats.length} chat histories');
   }
 
-  /// Henter en specifik chat med ID
+  /// Retrieves a specific chat by ID
   Future<Chat?> getChat(String chatId) async {
     if (_chats.isEmpty) {
       _chats = await _loadChats();
     }
 
-    // Prøv at parse chatId som et indeks
+    // Try to parse chatId as an index
     final index = int.tryParse(chatId);
     if (index != null && index > 0 && index <= _chats.length) {
       final chat = _chats[index - 1];
-      // Dobbelt-tjek at chat'en er gyldig
+      // Double-check that the chat is valid
       if (Chat.isValidChat(chat)) {
         return chat;
       } else {
-        print('Chat med indeks $index er ikke gyldig');
+        print('Chat with index $index is not valid');
         return null;
       }
     }
 
-    // Ellers søg efter matching ID
+    // Otherwise search for matching ID
     final chat = _chats.firstWhereOrNull((chat) => chat.id == chatId);
     if (chat != null && Chat.isValidChat(chat)) {
       return chat;
     }
     
-    print('Kunne ikke finde gyldig chat med ID: $chatId');
+    print('Could not find valid chat with ID: $chatId');
     return null;
   }
 
-  /// Viser Text User Interface (TUI) til at browse og se chats
+  /// Shows Text User Interface (TUI) to browse and view chats
   Future<void> showTUI() async {
     _chats = await _loadChats();
 
     if (_chats.isEmpty) {
-      print('Ingen chat historikker fundet i ${config.workspaceStoragePath}');
+      print('No chat histories found in ${config.workspaceStoragePath}');
       return;
     }
 
@@ -171,6 +172,7 @@ class ChatBrowser {
     var selectedIndex = 0;
     var viewingChat = false;
     var scrollOffset = 0;
+    var statusMessage = '';
 
     while (true) {
       console.clearScreen();
@@ -179,7 +181,8 @@ class ChatBrowser {
       if (!viewingChat) {
         _drawChatList(selectedIndex);
       } else {
-        _drawChatView(_chats[selectedIndex], scrollOffset);
+        _drawChatView(_chats[selectedIndex], scrollOffset, statusMessage);
+        statusMessage = ''; // Reset status message after displaying
       }
 
       final key = console.readKey();
@@ -191,7 +194,7 @@ class ChatBrowser {
       }
 
       if (!viewingChat) {
-        // Navigation i chat listen
+        // Navigation in chat list
         if (key.controlChar == ControlCharacter.arrowDown) {
           selectedIndex = (selectedIndex + 1) % _chats.length;
         } else if (key.controlChar == ControlCharacter.arrowUp) {
@@ -199,13 +202,13 @@ class ChatBrowser {
         } else if (key.controlChar == ControlCharacter.enter) {
           viewingChat = true;
           scrollOffset = 0;
-        } else if (key.char == 'q') {
+        } else if (key.char == 'q' || key.controlChar == ControlCharacter.ctrlQ) {
           console.clearScreen();
           console.resetCursorPosition();
           return;
         }
       } else {
-        // Navigation i chat visning
+        // Navigation in chat view
         if (key.controlChar == ControlCharacter.arrowDown) {
           scrollOffset += 1;
         } else if (key.controlChar == ControlCharacter.arrowUp) {
@@ -213,22 +216,70 @@ class ChatBrowser {
         } else if (key.char == 'q' ||
             key.controlChar == ControlCharacter.escape) {
           viewingChat = false;
+        } else if (key.char == 's') {
+          // Save chat as JSON
+          statusMessage = _saveCurrentChatAsJson(_chats[selectedIndex]);
         }
       }
     }
   }
 
-  /// Tegner chat listen
+  /// Save current chat as JSON in the current directory
+  String _saveCurrentChatAsJson(Chat chat) {
+    try {
+      final title = _sanitizeFilename(chat.title);
+      final reqId = chat.requestId.isNotEmpty ? chat.requestId : chat.id.split('_').first;
+      final filename = '$title-$reqId.json';
+      
+      // Convert chat to JSON
+      final jsonData = {
+        'id': chat.id,
+        'title': chat.title,
+        'requestId': reqId,
+        'messages': chat.messages.map((msg) => {
+          'role': msg.role,
+          'content': msg.content,
+          'timestamp': msg.timestamp.millisecondsSinceEpoch
+        }).toList()
+      };
+      
+      final jsonString = JsonEncoder.withIndent('  ').convert(jsonData);
+      
+      // Write to current directory
+      final file = File(path.join(Directory.current.path, filename));
+      file.writeAsStringSync(jsonString);
+      
+      return 'Chat saved to ${file.path}';
+    } catch (e) {
+      return 'Error saving chat: $e';
+    }
+  }
+
+  /// Sanitize filename for safe file operations
+  String _sanitizeFilename(String input) {
+    if (input.isEmpty) return 'chat';
+    
+    // Limit length
+    var sanitized = input.length > 30 ? input.substring(0, 30) : input;
+    
+    // Replace invalid filename characters
+    sanitized = sanitized.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+    sanitized = sanitized.replaceAll(RegExp(r'\s+'), '_');
+    
+    return sanitized;
+  }
+
+  /// Draws the chat list
   void _drawChatList(int selectedIndex) {
     final width = console.windowWidth;
 
     console.writeLine(
-      '=== Cursor Chat Historik Browser ==='.padRight(width),
+      '=== Cursor Chat History Browser ==='.padRight(width),
       TextAlignment.center,
     );
     console.writeLine('');
     console.writeLine(
-      'Tryk ↑/↓ for at navigere, Enter for at se chat, Q for at afslutte',
+      'Press ↑/↓ to navigate, Enter to view chat, q or Ctrl+Q to exit',
     );
     console.writeLine('');
 
@@ -236,19 +287,19 @@ class ChatBrowser {
     final requestIdWidth = 40;
 
     console.writeLine(
-      'ID | ${_padTruncate('Titel', titleWidth)} | ${_padTruncate('Request ID', requestIdWidth)} | Antal',
+      'ID | ${_padTruncate('Title', titleWidth)} | ${_padTruncate('Request ID', requestIdWidth)} | Count',
     );
     console.writeLine(''.padRight(width, '-'));
 
     for (var i = 0; i < _chats.length; i++) {
       final chat = _chats[i];
       
-      // Vis enten title eller ID baseret på format
+      // Show either title or ID based on format
       final displayTitle = chat.title.isEmpty || chat.title == 'Chat ${chat.id}'
           ? chat.id
           : chat.title;
       
-      // Brug chat.id som fallback for requestId
+      // Use chat.id as fallback for requestId
       final requestIdDisplay = chat.requestId.isNotEmpty ? chat.requestId : chat.id.split('_').first;
       
       final line = '${_padTruncate((i + 1).toString(), 3)} | '
@@ -267,20 +318,20 @@ class ChatBrowser {
     }
 
     console.writeLine('');
-    console.writeLine('Fandt ${_chats.length} chat historikker');
+    console.writeLine('Found ${_chats.length} chat histories');
   }
 
-  /// Tegner chat visning
-  void _drawChatView(Chat chat, int scrollOffset) {
+  /// Draws the chat view
+  void _drawChatView(Chat chat, int scrollOffset, [String statusMessage = '']) {
     final width = console.windowWidth;
-    final height = console.windowHeight - 5;
+    final height = console.windowHeight - 7; // Reduced height to accommodate status and help lines
 
     console.writeLine(
       '=== ${chat.title} ==='.padRight(width),
       TextAlignment.center,
     );
     console.writeLine('');
-    console.writeLine('Tryk ↑/↓ for at rulle, Q for at gå tilbage');
+    console.writeLine('Press ↑/↓ to scroll, q or ESC to go back, s to save as JSON');
     console.writeLine(''.padRight(width, '-'));
 
     final visibleMessages = chat.messages.skip(scrollOffset).take(height);
@@ -291,7 +342,7 @@ class ChatBrowser {
         '[$sender - ${DateFormat('HH:mm:ss').format(message.timestamp)}]',
       );
 
-      // Del indholdet op i linjer der passer til skærmen
+      // Split content into lines that fit the screen width
       final contentLines = _wrapText(message.content, width);
       for (final line in contentLines) {
         console.writeLine(line);
@@ -301,12 +352,27 @@ class ChatBrowser {
     }
 
     console.writeLine(''.padRight(width, '-'));
+    
+    // Show message position
     console.writeLine(
-      'Besked ${scrollOffset + 1}-${(scrollOffset + visibleMessages.length).clamp(1, chat.messages.length)} af ${chat.messages.length}',
+      'Message ${scrollOffset + 1}-${(scrollOffset + visibleMessages.length).clamp(1, chat.messages.length)} of ${chat.messages.length}',
     );
+    
+    // Show help text
+    console.writeLine(
+      '[q] Back  [ESC] Back  [s] Save JSON  [Ctrl+Q] Exit',
+      TextAlignment.center
+    );
+    
+    // Show status message if present
+    if (statusMessage.isNotEmpty) {
+      console.setForegroundColor(ConsoleColor.green);
+      console.writeLine(statusMessage, TextAlignment.center);
+      console.resetColorAttributes();
+    }
   }
 
-  /// Hjælpefunktion til at formattere tekst
+  /// Helper function to format text
   String _padTruncate(String text, int width) {
     if (text.length > width) {
       return text.substring(0, width - 3) + '...';
@@ -314,7 +380,7 @@ class ChatBrowser {
     return text.padRight(width);
   }
 
-  /// Hjælpefunktion til at wrappe tekst til en bestemt bredde
+  /// Helper function to wrap text to a specific width
   List<String> _wrapText(String text, int width) {
     final result = <String>[];
     final words = text.split(' ');
