@@ -42,44 +42,21 @@ String getCursorDataPath() {
 }
 
 /// Finder chat ud fra request ID og returnerer den fulde chat
-Chat? findChatByRequestId(String requestId) {
-  final workspacePath = getCursorDataPath();
-  final workspaceDir = Directory(workspacePath);
+Future<Chat?> findChatByRequestId(String requestId) async {
+  final config = Config.load('~/.cursor_chat_tool.conf');
+  final browser = ChatBrowser(config);
+  final allChats = await browser.loadAllChats();
   
-  if (!workspaceDir.existsSync()) {
-    print('Workspace mappe findes ikke: $workspacePath');
-    return null;
-  }
-  
-  try {
-    // Find alle mapper, der matcher request ID
-    final matchingFolders = workspaceDir.listSync().where((entity) {
-      if (entity is Directory) {
-        final folderName = entity.path.split(Platform.pathSeparator).last;
-        return folderName == requestId || folderName.contains(requestId);
-      }
-      return false;
-    }).toList();
-    
-    if (matchingFolders.isEmpty) {
-      print('Kunne ikke finde mappe med request ID: $requestId');
-      return null;
+  // Find chat med matching requestId
+  for (final chat in allChats) {
+    if (chat.id == requestId || chat.id.contains(requestId) || 
+        (chat.requestId.isNotEmpty && (chat.requestId == requestId || chat.requestId.contains(requestId)))) {
+      return chat;
     }
-    
-    // Brug det første match
-    final exactRequestId = matchingFolders.first.path.split(Platform.pathSeparator).last;
-    
-    // I denne forenklede implementation bruger vi bare ID'et til både ID og titel
-    // og returnerer en tom liste af beskeder
-    return Chat(
-      id: exactRequestId,
-      title: exactRequestId,
-      messages: [],
-    );
-  } catch (e) {
-    print('Fejl ved søgning efter chat: $e');
-    return null;
   }
+  
+  print('Kunne ikke finde chat med request ID: $requestId');
+  return null;
 }
 
 /// Henter en fuld chat fra databasen via chat ID
@@ -132,6 +109,7 @@ Chat? getFullChatFromDb(Database db, int chatId, [String? requestId]) {
         id: rId,
         title: title,
         messages: messages,
+        requestId: rId,
       );
     }
     
@@ -165,6 +143,7 @@ Chat? getFullChatFromDb(Database db, int chatId, [String? requestId]) {
       id: chatRequestId,
       title: title,
       messages: messages,
+      requestId: chatRequestId,
     );
   } catch (e) {
     print('Fejl ved hentning af chat fra db: $e');
@@ -173,21 +152,13 @@ Chat? getFullChatFromDb(Database db, int chatId, [String? requestId]) {
 }
 
 /// Henter en fuld chat fra CLI via chat ID
-Chat? getFullChatFromCli(String chatId) {
+Future<Chat?> getFullChatFromCli(String chatId) async {
   try {
-    final workspacePath = getCursorDataPath();
-    final workspaceDir = Directory(workspacePath);
-    
-    if (!workspaceDir.existsSync()) {
-      print('Workspace mappe findes ikke: $workspacePath');
-      return null;
-    }
-    
     // Parse chatId as integer index
     int? index = int.tryParse(chatId);
     if (index != null) {
       // Indlæs alle chats og vælg ud fra index
-      final allChats = getAllChats();
+      final allChats = await getAllChats();
       
       if (allChats.isEmpty) {
         print('Ingen chats fundet');
@@ -203,73 +174,56 @@ Chat? getFullChatFromCli(String chatId) {
     }
     
     // Hvis ikke et indeks, prøv at finde chat ud fra ID
-    return findChatByRequestId(chatId);
+    return await findChatByRequestId(chatId);
   } catch (e) {
     print('Fejl ved hentning af chat: $e');
     return null;
   }
 }
 
-/// Henter alle chats - forenklet version der bare bruger mappenavnene
-List<Chat> getAllChats() {
-  final workspacePath = getCursorDataPath();
-  final workspaceDir = Directory(workspacePath);
-  final chats = <Chat>[];
-  
-  if (!workspaceDir.existsSync()) {
-    print('Workspace mappe findes ikke: $workspacePath');
-    return [];
-  }
-  
-  try {
-    for (final entity in workspaceDir.listSync()) {
-      if (entity is Directory) {
-        final requestId = entity.path.split(Platform.pathSeparator).last;
-        
-        // Simpel chat med kun ID og titel (som er det samme som ID)
-        final chat = Chat(
-          id: requestId,
-          title: requestId,
-          messages: [], // Tom liste af beskeder, da vi ikke har brug for dem til visning
-        );
-        
-        chats.add(chat);
-      }
-    }
-    
-    return chats;
-  } catch (e) {
-    print('Fejl ved indlæsning af chats: $e');
-    return [];
-  }
+/// Henter alle chats (via ChatBrowser klassen)
+Future<List<Chat>> getAllChats() async {
+  final config = Config.load('~/.cursor_chat_tool.conf');
+  final browser = ChatBrowser(config);
+  return await browser.loadAllChats();
 }
 
 /// Viser liste over alle chats
-void printChatList() {
-  final allChats = getAllChats();
+Future<void> printChatList() async {
+  final allChats = await getAllChats();
   
   if (allChats.isEmpty) {
     print('Ingen chat historik fundet');
     return;
   }
   
-  print('Fandt ${allChats.length} chat historikker:');
+  print('=== Cursor Chat Historik Browser ===');
   print('');
-  print('ID | Titel | Request ID | Antal beskeder');
+  print('ID | Titel | Request ID | Antal');
   print('----------------------------------------');
   
   for (var i = 0; i < allChats.length; i++) {
     final chat = allChats[i];
+    final displayTitle = chat.title.isEmpty || chat.title == 'Chat ${chat.id}'
+        ? chat.id
+        : chat.title;
     
-    print('${i + 1} | ${chat.title} | ${chat.id} | ${chat.messages.length}');
+    // Brug chat.id som fallback for requestId
+    final requestIdDisplay = chat.requestId.isNotEmpty ? chat.requestId : chat.id.split('_').first;
+    
+    print('${i + 1} | ${displayTitle} | $requestIdDisplay | ${chat.messages.length}');
   }
+  
+  print('');
+  print('Fandt ${allChats.length} chat historikker');
 }
 
 /// Main funktion
-void main(List<String> arguments) {
+void main(List<String> arguments) async {
   final parser = ArgParser()
     ..addFlag('help', abbr: 'h', negatable: false, help: 'Vis hjælp')
     ..addFlag('list', abbr: 'l', negatable: false, help: 'List alle chat historikker')
+    ..addFlag('tui', abbr: 't', negatable: false, help: 'Åben TUI browser')
     ..addOption('extract', abbr: 'e', help: 'Udtræk en specifik chat (id eller alle)')
     ..addOption('format', abbr: 'f', defaultsTo: 'text', help: 'Output format (text, markdown, html, json)')
     ..addOption('output', abbr: 'o', defaultsTo: './output', help: 'Output mappe')
@@ -290,7 +244,13 @@ void main(List<String> arguments) {
     }
     
     if (results['list'] as bool) {
-      printChatList();
+      await printChatList();
+      return;
+    }
+    
+    if (results['tui'] as bool) {
+      final browser = ChatBrowser(config);
+      await browser.showTUI();
       return;
     }
     
@@ -303,7 +263,7 @@ void main(List<String> arguments) {
           ? results['output-dir'] as String
           : Directory.current.path;
       
-      extractChatWithRequestId(requestId, outputDir);
+      await extractChatWithRequestId(requestId, outputDir);
       return;
     }
     
@@ -320,7 +280,7 @@ void main(List<String> arguments) {
       
       if (chatId.toLowerCase() == 'alle' || chatId.toLowerCase() == 'all') {
         // Udtræk alle chats
-        final allChats = getAllChats();
+        final allChats = await getAllChats();
         
         if (allChats.isEmpty) {
           print('Ingen chats fundet til udtrækning');
@@ -339,7 +299,7 @@ void main(List<String> arguments) {
         print('Udtrak $counter chats til $outputDir');
       } else {
         // Udtræk en specifik chat
-        final specificChat = getFullChatFromCli(chatId);
+        final specificChat = await getFullChatFromCli(chatId);
         
         if (specificChat == null) {
           print('Ingen chats fundet til udtrækning');
@@ -352,6 +312,7 @@ void main(List<String> arguments) {
         
         print('Udtrak chat "${specificChat.title}" til ${path.basename(outputFile)}');
       }
+      return;
     }
     
     if (arguments.isEmpty) {
@@ -365,8 +326,8 @@ void main(List<String> arguments) {
 }
 
 /// Udtræk en chat med et specifikt request ID og gem som JSON i den specificerede mappe
-void extractChatWithRequestId(String requestId, String outputDir) {
-  final chat = findChatByRequestId(requestId);
+Future<void> extractChatWithRequestId(String requestId, String outputDir) async {
+  final chat = await findChatByRequestId(requestId);
   
   if (chat == null) {
     print('Ingen chat fundet med request ID: $requestId');

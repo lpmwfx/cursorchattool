@@ -248,7 +248,8 @@ class ChatBrowser {
           ? chat.id
           : chat.title;
       
-      final requestIdDisplay = chat.requestId.isNotEmpty ? chat.requestId : 'N/A';
+      // Brug chat.id som fallback for requestId
+      final requestIdDisplay = chat.requestId.isNotEmpty ? chat.requestId : chat.id.split('_').first;
       
       final line = '${_padTruncate((i + 1).toString(), 3)} | '
           '${_padTruncate(displayTitle, titleWidth)} | '
