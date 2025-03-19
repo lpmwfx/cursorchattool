@@ -43,11 +43,13 @@ class Chat {
   final String id;
   final String title;
   final List<ChatMessage> messages;
+  final String requestId;
 
   Chat({
     required this.id,
     required this.title,
     required this.messages,
+    this.requestId = '',
   });
 
   factory Chat.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,7 @@ class Chat {
       messages: (json['messages'] as List)
           .map((msg) => ChatMessage.fromJson(msg as Map<String, dynamic>))
           .toList(),
+      requestId: json['requestId'] ?? '',
     );
   }
 
@@ -65,6 +68,7 @@ class Chat {
       'id': id,
       'title': title,
       'messages': messages.map((msg) => msg.toJson()).toList(),
+      'requestId': requestId,
     };
   }
 
@@ -190,6 +194,7 @@ class Chat {
           id: chatId,
           title: title,
           messages: messages,
+          requestId: extractedRequestId,
         );
       } else if (data is Map) {
         // Hvis det er et objekt, undersøg strukturen
@@ -219,6 +224,7 @@ class Chat {
             id: chatId,
             title: title,
             messages: messages,
+            requestId: extractedRequestId,
           );
         } else if (data.containsKey('sessions')) {
           // Antagelse: { sessions: [{messages: [...]}] }
@@ -250,6 +256,7 @@ class Chat {
               id: chatId,
               title: title,
               messages: messages,
+              requestId: extractedRequestId,
             );
           }
         } else if (data.containsKey('chats')) {
@@ -282,6 +289,7 @@ class Chat {
               id: chatId,
               title: title,
               messages: messages,
+              requestId: extractedRequestId,
             );
           }
         } else if (data.containsKey('chatData')) {
@@ -312,6 +320,7 @@ class Chat {
               id: chatId,
               title: title,
               messages: messages,
+              requestId: extractedRequestId,
             );
           }
         }
@@ -340,7 +349,6 @@ class Chat {
   }
 
   DateTime get lastMessageTime {
-    if (messages.isEmpty) return DateTime.now();
-    return messages.last.timestamp;
+    return messages.isNotEmpty ? messages.last.timestamp : DateTime.now();
   }
 }

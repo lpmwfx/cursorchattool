@@ -16,8 +16,6 @@ import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import 'package:collection/collection.dart';
 
-import '../lib/cli/chat_model.dart' as cli_model;
-
 /// Finder stien til Cursor's data mappe baseret på OS
 String getCursorDataPath() {
   String home = '';

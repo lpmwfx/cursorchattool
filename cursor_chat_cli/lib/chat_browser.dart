@@ -107,18 +107,26 @@ class ChatBrowser {
       return;
     }
 
-    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
-
-    print('Fandt ${_chats.length} chat historikker:');
+    print('=== Cursor Chat Historik Browser ===');
     print('');
-    print('ID | Titel | Dato | Antal beskeder');
+    print('ID | Titel | Request ID | Antal');
     print('----------------------------------------');
 
     for (var i = 0; i < _chats.length; i++) {
       final chat = _chats[i];
-      final dateStr = dateFormat.format(chat.lastMessageTime);
-      print('${i + 1} | ${chat.title} | $dateStr | ${chat.messages.length}');
+      
+      // Vis enten title eller ID baseret på format
+      final displayTitle = chat.title.isEmpty || chat.title == 'Chat ${chat.id}'
+          ? chat.id
+          : chat.title;
+      
+      final requestIdDisplay = chat.requestId.isNotEmpty ? chat.requestId : 'N/A';
+      
+      print('${i + 1} | ${displayTitle} | $requestIdDisplay | ${chat.messages.length}');
     }
+    
+    print('');
+    print('Fandt ${_chats.length} chat historikker');
   }
 
   /// Henter en specifik chat med ID
@@ -212,7 +220,6 @@ class ChatBrowser {
 
   /// Tegner chat listen
   void _drawChatList(int selectedIndex) {
-    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
     final width = console.windowWidth;
 
     console.writeLine(
@@ -226,19 +233,26 @@ class ChatBrowser {
     console.writeLine('');
 
     final titleWidth = 40;
-    final dateWidth = 20;
+    final requestIdWidth = 40;
 
     console.writeLine(
-      'ID | ${_padTruncate('Titel', titleWidth)} | Dato | Antal',
+      'ID | ${_padTruncate('Titel', titleWidth)} | ${_padTruncate('Request ID', requestIdWidth)} | Antal',
     );
     console.writeLine(''.padRight(width, '-'));
 
     for (var i = 0; i < _chats.length; i++) {
       final chat = _chats[i];
-      final dateStr = dateFormat.format(chat.lastMessageTime);
+      
+      // Vis enten title eller ID baseret på format
+      final displayTitle = chat.title.isEmpty || chat.title == 'Chat ${chat.id}'
+          ? chat.id
+          : chat.title;
+      
+      final requestIdDisplay = chat.requestId.isNotEmpty ? chat.requestId : 'N/A';
+      
       final line = '${_padTruncate((i + 1).toString(), 3)} | '
-          '${_padTruncate(chat.title, titleWidth)} | '
-          '${_padTruncate(dateStr, dateWidth)} | '
+          '${_padTruncate(displayTitle, titleWidth)} | '
+          '${_padTruncate(requestIdDisplay, requestIdWidth)} | '
           '${chat.messages.length}';
 
       if (i == selectedIndex) {
